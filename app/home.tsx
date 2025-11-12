@@ -126,22 +126,16 @@ export default function Home() {
           </TouchableOpacity>
 
           <TouchableOpacity
-  style={styles.menuItem}
-  onPress={async () => {
-    try {
-      await AsyncStorage.removeItem("user");
-      setUser(null);
-      setMenuVisible(false);
-      router.push("/index"); // ✅ renvoie explicitement vers la page de connexion
-    } catch (error) {
-      console.log("Erreur lors de la déconnexion :", error);
-    }
-  }}
->
-  <Ionicons name="log-out-outline" size={22} color="#e53935" />
-  <Text style={[styles.menuText, { color: "#e53935" }]}>Se déconnecter</Text>
-</TouchableOpacity>
-
+            style={styles.menuItem}
+            onPress={async () => {
+              await AsyncStorage.removeItem("user");
+              setUser(null);
+              router.replace("./");
+            }}
+          >
+            <Ionicons name="log-out-outline" size={22} color="#e53935" />
+            <Text style={[styles.menuText, { color: "#e53935" }]}>Se déconnecter</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
     </ScrollView>
