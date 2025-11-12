@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Linking, ImageBackground, ScrollView, Modal } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router"; // ✅ ajouté Stack
 
 export default function Home() {
   const router = useRouter();
@@ -61,6 +61,9 @@ export default function Home() {
 
   return (
     <ScrollView style={{ flex: 1 }}>
+      {/* 🔹 Enlève le header "Home" */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       <ImageBackground
         source={require("../assets/images/perso.jpg")}
         style={styles.background}
@@ -123,16 +126,22 @@ export default function Home() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.menuItem}
-            onPress={async () => {
-              await AsyncStorage.removeItem("user");
-              setUser(null);
-              router.replace("/");
-            }}
-          >
-            <Ionicons name="log-out-outline" size={22} color="#e53935" />
-            <Text style={[styles.menuText, { color: "#e53935" }]}>Se déconnecter</Text>
-          </TouchableOpacity>
+  style={styles.menuItem}
+  onPress={async () => {
+    try {
+      await AsyncStorage.removeItem("user");
+      setUser(null);
+      setMenuVisible(false);
+      router.push("/index"); // ✅ renvoie explicitement vers la page de connexion
+    } catch (error) {
+      console.log("Erreur lors de la déconnexion :", error);
+    }
+  }}
+>
+  <Ionicons name="log-out-outline" size={22} color="#e53935" />
+  <Text style={[styles.menuText, { color: "#e53935" }]}>Se déconnecter</Text>
+</TouchableOpacity>
+
         </View>
       </Modal>
     </ScrollView>
@@ -153,8 +162,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   userName: { fontSize: 16, color: "#fff", fontWeight: "600" },
-  content: { paddingHorizontal: 20, paddingTop: 150 }, // 🟢 Texte plus bas
-  title: { fontSize: 30, color: "#fff", fontWeight: "bold", marginBottom: 12 }, // 🟢 Texte plus grand
+  content: { paddingHorizontal: 20, paddingTop: 150 },
+  title: { fontSize: 30, color: "#fff", fontWeight: "bold", marginBottom: 12 },
   description: { fontSize: 18, color: "#f0f0f0", lineHeight: 26, marginBottom: 25 },
 
   feature: {

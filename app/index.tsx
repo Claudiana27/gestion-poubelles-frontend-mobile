@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ImageBackground,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router"; // ✅ ajouté Stack
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -48,6 +48,9 @@ export default function LoginPage() {
 
   return (
     <View style={styles.container}>
+      {/* 🔹 Enlève le header "index" */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       <ImageBackground
         source={require("../assets/images/trash.jpg")}
         style={styles.background}
@@ -91,15 +94,15 @@ const styles = StyleSheet.create({
   },
 
   title: {
-  fontSize: 30,
-  fontWeight: "bold",
-  textAlign: "center",
-  color: "#f4f4f4",
-  textShadowColor: "rgba(0,0,0,0.5)",
-  textShadowOffset: { width: 1, height: 1 },
-  textShadowRadius: 4,
-  marginBottom: 40,
-},
+    fontSize: 30,
+    fontWeight: "bold",
+    textAlign: "center",
+    color: "#f4f4f4",
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 4,
+    marginBottom: 40,
+  },
 
   button: {
     backgroundColor: "#fff",

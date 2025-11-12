@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal } from "react-native";
 import MapView, { Marker, Circle } from "react-native-maps";
 import * as Location from "expo-location";
+import { Stack } from "expo-router"; // ✅ ajouté
 
 export default function Search() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -90,6 +91,9 @@ export default function Search() {
 
   return (
     <View style={styles.container}>
+      {/* 🔹 Enlève le header "Search" */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       <MapView style={styles.map} initialRegion={region} showsUserLocation={!!location} showsMyLocationButton>
         <Circle center={region} radius={1000} strokeColor="rgba(46,125,50,0.7)" fillColor="rgba(46,125,50,0.15)" />
         {location && <Marker coordinate={location} title="Vous êtes ici" pinColor="#2e7d32" />}
@@ -116,7 +120,7 @@ export default function Search() {
             <Text>Longitude: {selectedPoubelle?.longitude}</Text>
             <Text style={{ marginTop: 10 }}>Signaler l’état :</Text>
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 5 }}>
-              {[ "moyenne", "pleine", "détruit"].map((c) => (
+              {["moyenne", "pleine", "détruit"].map((c) => (
                 <TouchableOpacity
                   key={c}
                   style={styles.button}
