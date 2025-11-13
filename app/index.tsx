@@ -14,21 +14,26 @@ import { LinearGradient } from "expo-linear-gradient";
 export default function LoginPage() {
   const router = useRouter();
 
+  // 🔹 Fonction pour gérer le login Google
   const handleGoogleLogin = async () => {
-    // Vérifie si l'utilisateur est déjà connecté
-    const user = await AsyncStorage.getItem("user");
-    if (user) {
-      router.replace("/home");
-      return;
+    try {
+      const user = await AsyncStorage.getItem("user");
+      if (user) {
+        router.replace("/home");
+        return;
+      }
+      Linking.openURL(
+        "https://gestion-poubelles-backend-production.up.railway.app/auth/google"
+      );
+    } catch (err) {
+      console.log("Erreur handleGoogleLogin:", err);
     }
-    Linking.openURL(
-      "https://gestion-poubelles-backend-production.up.railway.app/auth/google"
-    );
   };
 
   useEffect(() => {
+    // 🔹 Gestion des redirections OAuth
     const handleRedirect = async (event: { url: string }) => {
-      // 🔹 Ne traiter que le scheme de redirection OAuth
+      console.log("URL reçue:", event.url); // Pour debug
       if (!event.url.startsWith("frontendmobile://auth")) return;
 
       try {
@@ -44,19 +49,24 @@ export default function LoginPage() {
       }
     };
 
+    // 🔹 Vérification de l'URL initiale à l'ouverture de l'app
     const checkInitialUrl = async () => {
-      const initialUrl = await Linking.getInitialURL();
-      if (initialUrl && initialUrl.startsWith("frontendmobile://auth")) {
-        handleRedirect({ url: initialUrl });
-      } else {
-        // Si pas de redirection, vérifier AsyncStorage pour rester connecté
-        const storedUser = await AsyncStorage.getItem("user");
-        if (storedUser) router.replace("/home");
+      try {
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl && initialUrl.startsWith("frontendmobile://auth")) {
+          handleRedirect({ url: initialUrl });
+        } else {
+          const storedUser = await AsyncStorage.getItem("user");
+          if (storedUser) router.replace("/home");
+        }
+      } catch (err) {
+        console.log("Erreur checkInitialUrl:", err);
       }
     };
 
     checkInitialUrl();
 
+    // 🔹 Écoute des redirections pendant l'exécution
     const subscription = Linking.addEventListener("url", handleRedirect);
     return () => subscription.remove();
   }, []);
