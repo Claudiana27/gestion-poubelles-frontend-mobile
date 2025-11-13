@@ -15,7 +15,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   const handleGoogleLogin = async () => {
-    // Vérifie d'abord si user existe
+    // Vérifie si l'utilisateur est déjà connecté
     const user = await AsyncStorage.getItem("user");
     if (user) {
       router.replace("/home");
@@ -28,6 +28,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     const handleRedirect = async (event: { url: string }) => {
+      // 🔹 Ne traiter que le scheme de redirection OAuth
+      if (!event.url.startsWith("frontendmobile://auth")) return;
+
       try {
         const params = new URLSearchParams(event.url.split("?")[1]);
         const userParam = params.get("user");
@@ -43,13 +46,15 @@ export default function LoginPage() {
 
     const checkInitialUrl = async () => {
       const initialUrl = await Linking.getInitialURL();
-      if (initialUrl) handleRedirect({ url: initialUrl });
-      else {
-        // Si pas de redirection, vérifie si user existe pour aller direct à /home
+      if (initialUrl && initialUrl.startsWith("frontendmobile://auth")) {
+        handleRedirect({ url: initialUrl });
+      } else {
+        // Si pas de redirection, vérifier AsyncStorage pour rester connecté
         const storedUser = await AsyncStorage.getItem("user");
         if (storedUser) router.replace("/home");
       }
     };
+
     checkInitialUrl();
 
     const subscription = Linking.addEventListener("url", handleRedirect);
