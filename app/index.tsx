@@ -7,14 +7,20 @@ import {
   StyleSheet,
   ImageBackground,
 } from "react-native";
-import { useRouter, Stack } from "expo-router"; // ✅ ajouté Stack
+import { useRouter, Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
+    // Vérifie d'abord si user existe
+    const user = await AsyncStorage.getItem("user");
+    if (user) {
+      router.replace("/home");
+      return;
+    }
     Linking.openURL(
       "https://gestion-poubelles-backend-production.up.railway.app/auth/google"
     );
@@ -38,24 +44,26 @@ export default function LoginPage() {
     const checkInitialUrl = async () => {
       const initialUrl = await Linking.getInitialURL();
       if (initialUrl) handleRedirect({ url: initialUrl });
+      else {
+        // Si pas de redirection, vérifie si user existe pour aller direct à /home
+        const storedUser = await AsyncStorage.getItem("user");
+        if (storedUser) router.replace("/home");
+      }
     };
     checkInitialUrl();
 
     const subscription = Linking.addEventListener("url", handleRedirect);
-
     return () => subscription.remove();
   }, []);
 
   return (
     <View style={styles.container}>
-      {/* 🔹 Enlève le header "index" */}
       <Stack.Screen options={{ headerShown: false }} />
 
       <ImageBackground
         source={require("../assets/images/trash.jpg")}
         style={styles.background}
       >
-        {/* Dégradé sombre en bas */}
         <LinearGradient
           colors={["transparent", "rgba(0,0,0,0.5)"]}
           style={styles.gradient}
@@ -77,22 +85,9 @@ export default function LoginPage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
-  background: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-
-  gradient: {
-    ...StyleSheet.absoluteFillObject, // prend toute la place
-  },
-
-  content: {
-    paddingHorizontal: 30,
-    paddingBottom: 80,
-    alignItems: "center",
-  },
-
+  background: { flex: 1, justifyContent: "flex-end" },
+  gradient: { ...StyleSheet.absoluteFillObject },
+  content: { paddingHorizontal: 30, paddingBottom: 80, alignItems: "center" },
   title: {
     fontSize: 30,
     fontWeight: "bold",
@@ -103,7 +98,6 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
     marginBottom: 40,
   },
-
   button: {
     backgroundColor: "#fff",
     paddingHorizontal: 25,
@@ -111,10 +105,5 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     elevation: 4,
   },
-
-  buttonText: {
-    color: "#2e7d32",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  buttonText: { color: "#2e7d32", fontSize: 16, fontWeight: "600" },
 });
