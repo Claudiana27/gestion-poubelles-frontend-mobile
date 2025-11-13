@@ -1,8 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+  Modal,
+} from "react-native";
 import MapView, { Marker, Circle } from "react-native-maps";
 import * as Location from "expo-location";
-import { Stack } from "expo-router"; // ✅ ajouté
+import { Stack } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Search() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -11,12 +19,26 @@ export default function Search() {
   const [poubelles, setPoubelles] = useState<any[]>([]);
   const [selectedPoubelle, setSelectedPoubelle] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [userLoaded, setUserLoaded] = useState(false);
 
   const BACKEND_URL = "https://gestion-poubelles-backend-production.up.railway.app";
-
   const defaultRegion = { latitude: -21.4333, longitude: 47.0833, latitudeDelta: 0.02, longitudeDelta: 0.02 };
 
-  // Récupération localisation
+  // 🔹 Vérifier si l'utilisateur est connecté
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const savedUser = await AsyncStorage.getItem("user");
+        setUserLoaded(true); // Peu importe si user existe ou pas
+      } catch (err) {
+        console.log("Erreur loadUser:", err);
+        setUserLoaded(true);
+      }
+    };
+    loadUser();
+  }, []);
+
+  // 🔹 Récupération localisation
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
     (async () => {
@@ -47,7 +69,7 @@ export default function Search() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  // Récupération poubelles
+  // 🔹 Récupération poubelles
   useEffect(() => {
     const fetchPoubelles = async () => {
       try {
@@ -61,7 +83,7 @@ export default function Search() {
     fetchPoubelles();
   }, []);
 
-  // Fonction pour signaler une poubelle
+  // 🔹 Fonction pour signaler une poubelle
   const signalerPoubelle = async (poubelle_id: number, capacite: string) => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/signalements`, {
@@ -78,11 +100,11 @@ export default function Search() {
     }
   };
 
-  if (loading) {
+  if (!userLoaded || loading) {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color="#2e7d32" />
-        <Text>Chargement de la localisation...</Text>
+        <Text>{errorMsg ? errorMsg : "Chargement de la localisation..."}</Text>
       </View>
     );
   }
@@ -94,8 +116,18 @@ export default function Search() {
       {/* 🔹 Enlève le header "Search" */}
       <Stack.Screen options={{ headerShown: false }} />
 
-      <MapView style={styles.map} initialRegion={region} showsUserLocation={!!location} showsMyLocationButton>
-        <Circle center={region} radius={1000} strokeColor="rgba(46,125,50,0.7)" fillColor="rgba(46,125,50,0.15)" />
+      <MapView
+        style={styles.map}
+        initialRegion={region}
+        showsUserLocation={!!location}
+        showsMyLocationButton
+      >
+        <Circle
+          center={region}
+          radius={1000}
+          strokeColor="rgba(46,125,50,0.7)"
+          fillColor="rgba(46,125,50,0.15)"
+        />
         {location && <Marker coordinate={location} title="Vous êtes ici" pinColor="#2e7d32" />}
         {poubelles.map((p) => (
           <Marker
@@ -112,7 +144,12 @@ export default function Search() {
       </MapView>
 
       {/* Modal signalement */}
-      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={{ fontWeight: "bold", fontSize: 16 }}>{selectedPoubelle?.nom}</Text>
@@ -133,7 +170,10 @@ export default function Search() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={{ marginTop: 10, alignSelf: "center" }} onPress={() => setModalVisible(false)}>
+            <TouchableOpacity
+              style={{ marginTop: 10, alignSelf: "center" }}
+              onPress={() => setModalVisible(false)}
+            >
               <Text style={{ color: "#900" }}>Annuler</Text>
             </TouchableOpacity>
           </View>
