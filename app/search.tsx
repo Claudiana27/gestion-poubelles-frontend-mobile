@@ -1,13 +1,6 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
-  Modal,
-} from "react-native";
-import MapView, { Marker, Circle } from "react-native-maps";
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal } from "react-native";
+import MapLibreGL from "@maplibre/maplibre-react-native";
 import * as Location from "expo-location";
 import { Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -22,54 +15,59 @@ export default function Search() {
   const [userLoaded, setUserLoaded] = useState(false);
 
   const BACKEND_URL = "https://gestion-poubelles-backend-production.up.railway.app";
-  const defaultRegion = { latitude: -21.4333, longitude: 47.0833, latitudeDelta: 0.02, longitudeDelta: 0.02 };
 
-  // 🔹 Vérifier si l'utilisateur est connecté
+  // ⛔ IMPORTANT : OBLIGATOIRE POUR MapLibre
+  MapLibreGL.setAccessToken(null);
+
+  // Chargement utilisateur
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const savedUser = await AsyncStorage.getItem("user");
-        setUserLoaded(true); // Peu importe si user existe ou pas
-      } catch (err) {
-        console.log("Erreur loadUser:", err);
+        await AsyncStorage.getItem("user");
+        setUserLoaded(true);
+      } catch {
         setUserLoaded(true);
       }
     };
     loadUser();
   }, []);
 
-  // 🔹 Récupération localisation
+  // Récupération localisation
   useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
+    let timeoutId: any;
+
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          setErrorMsg("Permission refusée pour accéder à la localisation.");
+          setErrorMsg("Permission refusée.");
           setLoading(false);
           return;
         }
 
         timeoutId = setTimeout(() => {
           if (!location) {
-            setErrorMsg("Position non trouvée rapidement, utilisation de Fianarantsoa par défaut.");
+            setErrorMsg("Position lente → localisation par défaut.");
             setLoading(false);
           }
         }, 10000);
 
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
         setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
         setLoading(false);
-      } catch (err) {
-        console.log(err);
-        setErrorMsg("Erreur lors de la récupération de la position.");
+      } catch {
+        setErrorMsg("Erreur de localisation.");
         setLoading(false);
       }
     })();
+
     return () => clearTimeout(timeoutId);
   }, []);
 
-  // 🔹 Récupération poubelles
+  // Récupération poubelles
   useEffect(() => {
     const fetchPoubelles = async () => {
       try {
@@ -83,19 +81,17 @@ export default function Search() {
     fetchPoubelles();
   }, []);
 
-  // 🔹 Fonction pour signaler une poubelle
+  // Envoi signalement
   const signalerPoubelle = async (poubelle_id: number, capacite: string) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/signalements`, {
+      await fetch(`${BACKEND_URL}/api/signalements`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ poubelle_id, capacite }),
       });
-      const data = await res.json();
-      console.log(data);
+
       alert("Signalement envoyé !");
-    } catch (err) {
-      console.log(err);
+    } catch {
       alert("Erreur lors du signalement.");
     }
   };
@@ -104,58 +100,81 @@ export default function Search() {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color="#2e7d32" />
-        <Text>{errorMsg ? errorMsg : "Chargement de la localisation..."}</Text>
+        <Text>{errorMsg ?? "Chargement de la localisation..."}</Text>
       </View>
     );
   }
 
-  const region = location ? { ...location, latitudeDelta: 0.02, longitudeDelta: 0.02 } : defaultRegion;
+  const userCoords = location || { latitude: -21.4333, longitude: 47.0833 };
+
+  // --- Cercle de 1 KM autour de l'utilisateur
+  const circleGeoJSON = {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [userCoords.longitude, userCoords.latitude],
+        },
+        properties: {},
+      },
+    ],
+  };
 
   return (
     <View style={styles.container}>
-      {/* 🔹 Enlève le header "Search" */}
       <Stack.Screen options={{ headerShown: false }} />
 
-      <MapView
-        style={styles.map}
-        initialRegion={region}
-        showsUserLocation={!!location}
-        showsMyLocationButton
-      >
-        <Circle
-          center={region}
-          radius={1000}
-          strokeColor="rgba(46,125,50,0.7)"
-          fillColor="rgba(46,125,50,0.15)"
+      <MapLibreGL.MapView style={styles.map}>
+        <MapLibreGL.Camera
+          zoomLevel={14}
+          centerCoordinate={[userCoords.longitude, userCoords.latitude]}
         />
-        {location && <Marker coordinate={location} title="Vous êtes ici" pinColor="#2e7d32" />}
+
+        {/* Cercle 1 km */}
+        <MapLibreGL.ShapeSource id="circle" shape={circleGeoJSON}>
+          <MapLibreGL.CircleLayer
+            id="circleLayer"
+            style={{
+              circleRadius: 180,
+              circleColor: "rgba(46,125,50,0.15)",
+              circleStrokeWidth: 2,
+              circleStrokeColor: "rgba(46,125,50,0.7)",
+            }}
+          />
+        </MapLibreGL.ShapeSource>
+
+        {/* Position de l’utilisateur */}
+        <MapLibreGL.PointAnnotation
+          id="user"
+          coordinate={[userCoords.longitude, userCoords.latitude]}
+        />
+
+        {/* Markers poubelles */}
         {poubelles.map((p) => (
-          <Marker
+          <MapLibreGL.PointAnnotation
             key={p.id}
-            coordinate={{ latitude: parseFloat(p.latitude), longitude: parseFloat(p.longitude) }}
-            title={p.nom}
-            pinColor="#009688"
-            onPress={() => {
+            id={`p-${p.id}`}
+            coordinate={[parseFloat(p.longitude), parseFloat(p.latitude)]}
+            onSelected={() => {
               setSelectedPoubelle(p);
               setModalVisible(true);
             }}
           />
         ))}
-      </MapView>
+      </MapLibreGL.MapView>
 
       {/* Modal signalement */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
+      <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={{ fontWeight: "bold", fontSize: 16 }}>{selectedPoubelle?.nom}</Text>
             <Text>Latitude: {selectedPoubelle?.latitude}</Text>
             <Text>Longitude: {selectedPoubelle?.longitude}</Text>
-            <Text style={{ marginTop: 10 }}>Signaler l’état :</Text>
+
+            <Text style={{ marginTop: 10 }}>Signaler :</Text>
+
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 5 }}>
               {["moyenne", "pleine", "détruit"].map((c) => (
                 <TouchableOpacity
@@ -166,10 +185,11 @@ export default function Search() {
                     setModalVisible(false);
                   }}
                 >
-                  <Text style={{ color: "#fff", textAlign: "center" }}>{c}</Text>
+                  <Text style={{ color: "#fff" }}>{c}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+
             <TouchableOpacity
               style={{ marginTop: 10, alignSelf: "center" }}
               onPress={() => setModalVisible(false)}
@@ -187,7 +207,22 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
   loader: { flex: 1, justifyContent: "center", alignItems: "center" },
-  modalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" },
-  modalContent: { width: 250, backgroundColor: "#fff", padding: 20, borderRadius: 10 },
-  button: { backgroundColor: "#2e7d32", padding: 6, borderRadius: 5, minWidth: 60 },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    width: 250,
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+  },
+  button: {
+    backgroundColor: "#2e7d32",
+    padding: 6,
+    borderRadius: 5,
+    minWidth: 60,
+  },
 });
