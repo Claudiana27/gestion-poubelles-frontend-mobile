@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal } from "react-native";
-import MapboxGL from "@rnmapbox/maps";
+import MapView, { Marker, Circle } from "react-native-maps";
 import * as Location from "expo-location";
-import { Stack } from "expo-router";
-
-MapboxGL.setAccessToken(null); // on utilise les tuiles MapLibre, pas de token Mapbox
+import { Stack } from "expo-router"; // ✅ ajouté
 
 export default function Search() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -16,15 +14,11 @@ export default function Search() {
 
   const BACKEND_URL = "https://gestion-poubelles-backend-production.up.railway.app";
 
-  const defaultRegion = {
-    latitude: -21.4333,
-    longitude: 47.0833,
-  };
+  const defaultRegion = { latitude: -21.4333, longitude: 47.0833, latitudeDelta: 0.02, longitudeDelta: 0.02 };
 
   // Récupération localisation
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
-
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -36,20 +30,13 @@ export default function Search() {
 
         timeoutId = setTimeout(() => {
           if (!location) {
-            setErrorMsg("Position non trouvée, position par défaut utilisée.");
+            setErrorMsg("Position non trouvée rapidement, utilisation de Fianarantsoa par défaut.");
             setLoading(false);
           }
         }, 10000);
 
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-
-        setLocation({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-        });
-
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
         setLoading(false);
       } catch (err) {
         console.log(err);
@@ -57,7 +44,6 @@ export default function Search() {
         setLoading(false);
       }
     })();
-
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -75,14 +61,16 @@ export default function Search() {
     fetchPoubelles();
   }, []);
 
-  // Fonction signalement
+  // Fonction pour signaler une poubelle
   const signalerPoubelle = async (poubelle_id: number, capacite: string) => {
     try {
-      await fetch(`${BACKEND_URL}/api/signalements`, {
+      const res = await fetch(`${BACKEND_URL}/api/signalements`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ poubelle_id, capacite }),
       });
+      const data = await res.json();
+      console.log(data);
       alert("Signalement envoyé !");
     } catch (err) {
       console.log(err);
@@ -99,97 +87,38 @@ export default function Search() {
     );
   }
 
-  const userCoord = location
-    ? [location.longitude, location.latitude]
-    : [defaultRegion.longitude, defaultRegion.latitude];
+  const region = location ? { ...location, latitudeDelta: 0.02, longitudeDelta: 0.02 } : defaultRegion;
 
   return (
     <View style={styles.container}>
+      {/* 🔹 Enlève le header "Search" */}
       <Stack.Screen options={{ headerShown: false }} />
 
-      <MapboxGL.MapView
-        style={styles.map}
-        styleURL="https://demotiles.maplibre.org/style.json"
-      >
-        <MapboxGL.Camera
-          zoomLevel={14}
-          centerCoordinate={userCoord}
-          animationMode="flyTo"
-          animationDuration={1000}
-        />
-
-        {/* ---- Cercle 1km autour de l'utilisateur (ShapeSource require Feature avec properties) ---- */}
-        <MapboxGL.ShapeSource
-          id="circle"
-          shape={{
-            type: "Feature",
-            properties: {},                     // <-- IMPORTANT : required by the type
-            geometry: {
-              type: "Point",
-              coordinates: userCoord,
-            },
-          }}
-        >
-          <MapboxGL.CircleLayer
-            id="circleLayer"
-            style={{
-              circleRadius: 120,
-              circleColor: "rgba(46,125,50,0.15)",
-              circleStrokeColor: "rgba(46,125,50,0.7)",
-              circleStrokeWidth: 2,
-            }}
-          />
-        </MapboxGL.ShapeSource>
-
-        {/* Position utilisateur */}
-        <MapboxGL.PointAnnotation id="user" coordinate={userCoord}>
-          <View
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: "#2e7d32",
-              borderWidth: 3,
-              borderColor: "#fff",
-            }}
-          />
-        </MapboxGL.PointAnnotation>
-
-        {/* Poubelles */}
+      <MapView style={styles.map} initialRegion={region} showsUserLocation={!!location} showsMyLocationButton>
+        <Circle center={region} radius={1000} strokeColor="rgba(46,125,50,0.7)" fillColor="rgba(46,125,50,0.15)" />
+        {location && <Marker coordinate={location} title="Vous êtes ici" pinColor="#2e7d32" />}
         {poubelles.map((p) => (
-          <MapboxGL.PointAnnotation
-            key={p.id.toString()}
-            id={`p${p.id}`}
-            coordinate={[parseFloat(p.longitude), parseFloat(p.latitude)]}
-            onSelected={() => {
+          <Marker
+            key={p.id}
+            coordinate={{ latitude: parseFloat(p.latitude), longitude: parseFloat(p.longitude) }}
+            title={p.nom}
+            pinColor="#009688"
+            onPress={() => {
               setSelectedPoubelle(p);
               setModalVisible(true);
             }}
-          >
-            <View
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: 9,
-                backgroundColor: "#009688",
-                borderWidth: 2,
-                borderColor: "#fff",
-              }}
-            />
-          </MapboxGL.PointAnnotation>
+          />
         ))}
-      </MapboxGL.MapView>
+      </MapView>
 
       {/* Modal signalement */}
-      <Modal visible={modalVisible} transparent animationType="slide">
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={{ fontWeight: "bold", fontSize: 16 }}>{selectedPoubelle?.nom}</Text>
             <Text>Latitude: {selectedPoubelle?.latitude}</Text>
             <Text>Longitude: {selectedPoubelle?.longitude}</Text>
-
             <Text style={{ marginTop: 10 }}>Signaler l’état :</Text>
-
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 5 }}>
               {["moyenne", "pleine", "détruit"].map((c) => (
                 <TouchableOpacity
@@ -204,7 +133,6 @@ export default function Search() {
                 </TouchableOpacity>
               ))}
             </View>
-
             <TouchableOpacity style={{ marginTop: 10, alignSelf: "center" }} onPress={() => setModalVisible(false)}>
               <Text style={{ color: "#900" }}>Annuler</Text>
             </TouchableOpacity>
