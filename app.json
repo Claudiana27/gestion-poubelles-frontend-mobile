@@ -51,7 +51,18 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+
+      "./plugins/withMapboxRepo.js",
+
+      [
+        "@rnmapbox/maps",
+        {
+          "android": {
+            "useTextureView": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
